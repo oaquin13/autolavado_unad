@@ -14,7 +14,4 @@ Este proyecto consiste en una aplicación de escritorio desarrollada en Python c
 - **Usuario:** `programacion`
 - **Contraseña:** `programacion`
 
-### 🚀 Instrucciones de Ejecución
-1. Clonar el repositorio:
-   ```bash
-   git clone [https://github.com/TU_USUARIO/autolavado_unad_fase2.git](https://github.com/TU_USUARIO/autolavado_unad_fase2.git)
+
