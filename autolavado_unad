@@ -1,1 +1,475 @@
+"""
+UNAD - Universidad Nacional Abierta y a Distancia
+Escuela de Ciencias Básicas, Tecnología e Ingeniería (ECBTI)
+Programa: Ingeniería de Sistemas
+Curso: Programación (Código: 213023)
+Fase 2 - Ejercicio 3: Sistema para Control de Lavado
+Lenguaje: Python 3
+GUI: Tkinter
+"""
 
+import math
+import tkinter as tk
+from tkinter import messagebox, ttk
+
+
+# ==============================================================================
+# MODELO DE DATOS (POO / ENCAPSULAMIENTO)
+# ==============================================================================
+
+
+class Usuario:
+    """Clase que gestiona la autenticación del usuario del sistema."""
+
+    def __init__(self):
+        # Atributos privados requeridos por la guía
+        self._usuario = "programacion"
+        self._password = "programacion"
+
+    def validar(self, usuario_ingresado: str, password_ingresada: str) -> bool:
+        """Valida credenciales contra atributos privados."""
+        return (
+            self._usuario == usuario_ingresado
+            and self._password == password_ingresada
+        )
+
+
+class AutoLavado:
+    """Clase que representa un vehículo dentro del sistema de autolavado."""
+
+    def __init__(self, placa: str, tarifa_hora: float):
+        # Atributos privados requeridos por la guía
+        self._placa = placa.upper().strip()
+        self._hora_ingreso = 0.0  # Almacenado internamente en formato 24h
+        self._hora_salida = 0.0   # Almacenado internamente en formato 24h
+        self._tarifa_hora = tarifa_hora
+        self._estado = "In Service"  # Estado del vehículo
+        self._valor_cobrado = 0.0    # Valor total cobrado al finalizar
+
+    def registrar_ingreso(self, hora_24h: float) -> None:
+        """Registra la hora de ingreso del vehículo."""
+        self._hora_ingreso = hora_24h
+
+    def registrar_salida(self, hora_24h: float) -> None:
+        """Registra la hora de salida del vehículo y calcula el monto cobrado."""
+        self._hora_salida = hora_24h
+        self._estado = "Completed"
+        self._valor_cobrado = self.calcular_pago(hora_24h)
+
+    def calcular_pago(self, hora_salida_24h: float) -> float:
+        """Calcula el costo total cobrado por horas o fracción de hora."""
+        tiempo_transcurrido = hora_salida_24h - self._hora_ingreso
+        horas_cobradas = math.ceil(tiempo_transcurrido)
+        return horas_cobradas * self._tarifa_hora
+
+    def obtener_placa(self) -> str:
+        """Retorna la placa del vehículo para identificación."""
+        return self._placa
+
+
+# ==============================================================================
+# FUNCIONES AUXILIARES DE CONVERSIÓN DE HORA (12h AM/PM <-> 24h)
+# ==============================================================================
+
+
+def convertir_a_24h(hora_12h: float, am_pm: str) -> float:
+    """Convierte una hora en formato 12h y su prefijo AM/PM a formato decimal 24h."""
+    am_pm = am_pm.upper().strip()
+    if hora_12h < 1 or hora_12h > 12:
+        raise ValueError("Hour value must be between 1 and 12 for 12-hour format.")
+
+    if am_pm == "AM":
+        return 0.0 if hora_12h == 12 else hora_12h
+    elif am_pm == "PM":
+        return 12.0 if hora_12h == 12 else hora_12h + 12.0
+    else:
+        raise ValueError("Invalid period format. Use AM or PM.")
+
+
+def formatear_12h(hora_24h: float) -> str:
+    """Convierte un valor flotante en formato 24h a una cadena legible en formato 12h AM/PM."""
+    horas_enteras = int(hora_24h)
+    minutos = int(round((hora_24h - horas_enteras) * 60))
+
+    periodo = "AM"
+    if horas_enteras >= 12:
+        periodo = "PM"
+
+    hora_12 = horas_enteras % 12
+    if hora_12 == 0:
+        hora_12 = 12
+
+    return f"{hora_12:02d}:{minutos:02d} {periodo}"
+
+
+# ==============================================================================
+# INTERFAZ GRÁFICA EN TKINTER (GUI EN INGLÉS)
+# ==============================================================================
+
+
+class LoginWindow:
+    """Ventana de inicio de sesión."""
+
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.root.title("System Authentication - UNAD")
+        self.root.geometry("400x300")
+        self.root.resizable(False, False)
+
+        self.usuario_model = Usuario()
+
+        # Estilos de la UI
+        frame = ttk.Frame(self.root, padding=30)
+        frame.pack(expand=True, fill="both")
+
+        ttk.Label(
+            frame,
+            text="Car Wash System Login",
+            font=("Helvetica", 14, "bold"),
+        ).pack(pady=(0, 20))
+
+        # Input Usuario
+        ttk.Label(frame, text="Username:", font=("Helvetica", 10)).pack(
+            anchor="w"
+        )
+        self.txt_user = ttk.Entry(frame, font=("Helvetica", 10))
+        self.txt_user.pack(fill="x", pady=(2, 10))
+        self.txt_user.focus()
+
+        # Input Password
+        ttk.Label(frame, text="Password:", font=("Helvetica", 10)).pack(
+            anchor="w"
+        )
+        self.txt_pass = ttk.Entry(frame, font=("Helvetica", 10), show="*")
+        self.txt_pass.pack(fill="x", pady=(2, 20))
+
+        # Botón Login
+        btn_login = ttk.Button(
+            frame, text="Log In", command=self.autenticar_usuario
+        )
+        btn_login.pack(fill="x")
+
+        # Permitir iniciar con tecla Enter
+        self.root.bind("<Return>", lambda event: self.autenticar_usuario())
+
+    def autenticar_usuario(self):
+        usr = self.txt_user.get().strip()
+        pwd = self.txt_pass.get().strip()
+
+        if self.usuario_model.validar(usr, pwd):
+            messagebox.showinfo(
+                "Access Granted", "Welcome to the Car Wash Management System!"
+            )
+            self.root.destroy()
+            # Iniciar aplicación principal
+            main_window = tk.Tk()
+            CarWashApp(main_window)
+            main_window.mainloop()
+        else:
+            messagebox.showerror(
+                "Access Denied",
+                "Invalid username or password.\nCredentials are: programacion / programacion",
+            )
+            self.txt_pass.delete(0, tk.END)
+
+
+class CarWashApp:
+    """Ventana principal para la gestión del servicio de autolavado."""
+
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.root.title("Car Wash Management System")
+        self.root.geometry("780x600")
+
+        # Listas internas para POO
+        self.lista_autos_activos = []    # Lista interna de activos
+        self.historial_completo = []     # Lista interna de TODOS los ingresados
+
+        self.crear_interfaz()
+
+    def crear_interfaz(self):
+        # Panel Superior: Registro de Entrada
+        frame_input = ttk.LabelFrame(
+            self.root, text=" Vehicle Registration (Check-In) ", padding=15
+        )
+        frame_input.pack(fill="x", padx=15, pady=10)
+
+        ttk.Label(frame_input, text="License Plate:").grid(
+            row=0, column=0, padx=5, pady=5, sticky="e"
+        )
+        self.entry_placa = ttk.Entry(frame_input, width=12)
+        self.entry_placa.grid(row=0, column=1, padx=5, pady=5)
+
+        ttk.Label(frame_input, text="Entry Hour (1-12):").grid(
+            row=0, column=2, padx=5, pady=5, sticky="e"
+        )
+        self.entry_ingreso = ttk.Entry(frame_input, width=8)
+        self.entry_ingreso.grid(row=0, column=3, padx=2, pady=5)
+
+        self.combo_ampm_ingreso = ttk.Combobox(
+            frame_input, values=["AM", "PM"], state="readonly", width=5
+        )
+        self.combo_ampm_ingreso.set("AM")
+        self.combo_ampm_ingreso.grid(row=0, column=4, padx=5, pady=5)
+
+        ttk.Label(frame_input, text="Hourly Rate ($):").grid(
+            row=1, column=0, padx=5, pady=5, sticky="e"
+        )
+        self.entry_tarifa = ttk.Entry(frame_input, width=12)
+        self.entry_tarifa.grid(row=1, column=1, padx=5, pady=5)
+
+        btn_register = ttk.Button(
+            frame_input, text="Register Entry", command=self.registrar_vehiculo
+        )
+        btn_register.grid(row=1, column=2, columnspan=3, padx=5, pady=5, sticky="ew")
+
+        # Panel Central: Lista de Vehículos Activos
+        frame_table = ttk.LabelFrame(
+            self.root, text=" Active Vehicles in Service ", padding=15
+        )
+        frame_table.pack(fill="both", expand=True, padx=15, pady=5)
+
+        columns = ("Plate", "Entry Hour", "Hourly Rate")
+        self.tree = ttk.Treeview(
+            frame_table, columns=columns, show="headings", height=7
+        )
+
+        self.tree.heading("Plate", text="License Plate")
+        self.tree.heading("Entry Hour", text="Entry Hour (12h)")
+        self.tree.heading("Hourly Rate", text="Hourly Rate ($)")
+
+        self.tree.column("Plate", anchor="center", width=180)
+        self.tree.column("Entry Hour", anchor="center", width=180)
+        self.tree.column("Hourly Rate", anchor="center", width=180)
+
+        self.tree.pack(fill="both", expand=True)
+
+        # Panel Inferior: Salida y Botón de Historial
+        frame_checkout = ttk.LabelFrame(
+            self.root, text=" Vehicle Departure & System Actions ", padding=15
+        )
+        frame_checkout.pack(fill="x", padx=15, pady=10)
+
+        ttk.Label(frame_checkout, text="Departure Hour (1-12):").grid(
+            row=0, column=0, padx=5, pady=5, sticky="e"
+        )
+        self.entry_salida = ttk.Entry(frame_checkout, width=8)
+        self.entry_salida.grid(row=0, column=1, padx=2, pady=5)
+
+        self.combo_ampm_salida = ttk.Combobox(
+            frame_checkout, values=["AM", "PM"], state="readonly", width=5
+        )
+        self.combo_ampm_salida.set("PM")
+        self.combo_ampm_salida.grid(row=0, column=2, padx=5, pady=5)
+
+        btn_checkout = ttk.Button(
+            frame_checkout,
+            text="Process Departure",
+            command=self.procesar_salida,
+        )
+        btn_checkout.grid(row=0, column=3, padx=10, pady=5)
+
+        # Botón para ver la lista interna del historial completo
+        btn_history = ttk.Button(
+            frame_checkout,
+            text="View All Entered Vehicles History",
+            command=self.mostrar_historial_completo,
+        )
+        btn_history.grid(row=0, column=4, padx=10, pady=5)
+
+    def registrar_vehiculo(self):
+        """Valida y guarda una nueva entrada en las listas internas."""
+        placa = self.entry_placa.get().strip()
+        str_ingreso = self.entry_ingreso.get().strip()
+        ampm_ingreso = self.combo_ampm_ingreso.get()
+        str_tarifa = self.entry_tarifa.get().strip()
+
+        if not placa or not str_ingreso or not str_tarifa:
+            messagebox.showwarning(
+                "Missing Data", "Please fill in all input fields."
+            )
+            return
+
+        try:
+            hora_12h = float(str_ingreso)
+            tarifa = float(str_tarifa)
+
+            if tarifa <= 0:
+                raise ValueError("Hourly rate must be greater than zero.")
+
+            hora_ingreso_24h = convertir_a_24h(hora_12h, ampm_ingreso)
+
+            # Instanciación POO del objeto AutoLavado
+            auto = AutoLavado(placa, tarifa)
+            auto.registrar_ingreso(hora_ingreso_24h)
+
+            # Guardar tanto en activos como en el historial general
+            self.lista_autos_activos.append(auto)
+            self.historial_completo.append(auto)
+
+            # Insertar en la tabla visual Tkinter
+            hora_formateada = formatear_12h(hora_ingreso_24h)
+            self.tree.insert(
+                "",
+                "end",
+                values=(auto.obtener_placa(), hora_formateada, f"${tarifa:.2f}"),
+            )
+
+            # Limpiar entradas
+            self.entry_placa.delete(0, tk.END)
+            self.entry_ingreso.delete(0, tk.END)
+            self.entry_tarifa.delete(0, tk.END)
+
+            messagebox.showinfo("Success", f"Vehicle {auto.obtener_placa()} registered at {hora_formateada}!")
+
+        except ValueError as e:
+            messagebox.showerror("Invalid Input", f"Error: {e}")
+
+    def procesar_salida(self):
+        """Valida la hora de salida, cambia estado del objeto y calcula el costo."""
+        selected_item = self.tree.selection()
+
+        if not selected_item:
+            messagebox.showwarning(
+                "Selection Required", "Please select a vehicle from the active list."
+            )
+            return
+
+        str_salida = self.entry_salida.get().strip()
+        ampm_salida = self.combo_ampm_salida.get()
+
+        if not str_salida:
+            messagebox.showwarning(
+                "Missing Data", "Please enter the departure hour."
+            )
+            return
+
+        try:
+            hora_12h_salida = float(str_salida)
+            hora_salida_24h = convertir_a_24h(hora_12h_salida, ampm_salida)
+
+            item_values = self.tree.item(selected_item, "values")
+            placa_seleccionada = item_values[0]
+
+            auto_obj = None
+            for auto in self.lista_autos_activos:
+                if auto.obtener_placa() == placa_seleccionada:
+                    auto_obj = auto
+                    break
+
+            if auto_obj:
+                if hora_salida_24h <= auto_obj._hora_ingreso:
+                    messagebox.showerror(
+                        "Time Validation Error",
+                        f"Departure hour ({formatear_12h(hora_salida_24h)}) must be strictly after entry hour ({formatear_12h(auto_obj._hora_ingreso)}).",
+                    )
+                    return
+
+                # Registrar salida (actualiza atributos privados _hora_salida y _valor_cobrado)
+                auto_obj.registrar_salida(hora_salida_24h)
+
+                messagebox.showinfo(
+                    "Service Receipt",
+                    f"--- CAR WASH RECEIPT ---\n\n"
+                    f"Vehicle Plate: {auto_obj.obtener_placa()}\n"
+                    f"Entry Time: {formatear_12h(auto_obj._hora_ingreso)}\n"
+                    f"Departure Time: {formatear_12h(hora_salida_24h)}\n"
+                    f"Total Hours Charged: {math.ceil(hora_salida_24h - auto_obj._hora_ingreso)} h\n"
+                    f"-----------------------------\n"
+                    f"TOTAL AMOUNT DUE: ${auto_obj._valor_cobrado:.2f}",
+                )
+
+                # Se retira de la lista de activos y de la tabla principal
+                self.lista_autos_activos.remove(auto_obj)
+                self.tree.delete(selected_item)
+                self.entry_salida.delete(0, tk.END)
+
+        except ValueError as e:
+            messagebox.showerror("Invalid Input", f"Error: {e}")
+
+    def mostrar_historial_completo(self):
+        """Abre una nueva ventana mostrando el historial completo y el total diario acumulado."""
+        if not self.historial_completo:
+            messagebox.showinfo(
+                "Empty History", "No vehicles have been registered in the system yet."
+            )
+            return
+
+        # Ventana Modal (Toplevel)
+        history_window = tk.Toplevel(self.root)
+        history_window.title("Complete Vehicle Entry History & Revenue")
+        history_window.geometry("700x420")
+
+        frame_hist = ttk.Frame(history_window, padding=15)
+        frame_hist.pack(fill="both", expand=True)
+
+        ttk.Label(
+            frame_hist,
+            text="Internal Master List - Registered Vehicles History",
+            font=("Helvetica", 11, "bold"),
+        ).pack(pady=(0, 10))
+
+        # Tabla del historial con columna de 'Charged Amount'
+        cols = ("Plate", "Entry Hour", "Status", "Departure Hour", "Charged Amount")
+        tree_hist = ttk.Treeview(frame_hist, columns=cols, show="headings", height=9)
+
+        tree_hist.heading("Plate", text="License Plate")
+        tree_hist.heading("Entry Hour", text="Entry Hour")
+        tree_hist.heading("Status", text="Status")
+        tree_hist.heading("Departure Hour", text="Departure Hour")
+        tree_hist.heading("Charged Amount", text="Charged Amount ($)")
+
+        tree_hist.column("Plate", anchor="center", width=110)
+        tree_hist.column("Entry Hour", anchor="center", width=110)
+        tree_hist.column("Status", anchor="center", width=110)
+        tree_hist.column("Departure Hour", anchor="center", width=120)
+        tree_hist.column("Charged Amount", anchor="center", width=130)
+
+        # Cálculo del acumulado total diario
+        total_diario = 0.0
+
+        # Poblar la tabla recorriendo la lista interna de objetos
+        for auto in self.historial_completo:
+            if auto._estado == "Completed":
+                h_salida_txt = formatear_12h(auto._hora_salida)
+                monto_txt = f"${auto._valor_cobrado:.2f}"
+                total_diario += auto._valor_cobrado
+            else:
+                h_salida_txt = "N/A"
+                monto_txt = "$0.00 (Pending)"
+
+            tree_hist.insert(
+                "",
+                "end",
+                values=(
+                    auto.obtener_placa(),
+                    formatear_12h(auto._hora_ingreso),
+                    auto._estado,
+                    h_salida_txt,
+                    monto_txt,
+                ),
+            )
+
+        tree_hist.pack(fill="both", expand=True)
+
+        # Panel inferior para desplegar el total generado en el día
+        frame_summary = ttk.Frame(frame_hist, padding=(0, 15, 0, 0))
+        frame_summary.pack(fill="x")
+
+        lbl_total = ttk.Label(
+            frame_summary,
+            text=f"TOTAL DAILY REVENUE GENERATED: ${total_diario:.2f}",
+            font=("Helvetica", 12, "bold"),
+            foreground="#1E8449",
+        )
+        lbl_total.pack(anchor="e")
+
+
+# ==============================================================================
+# PUNTO DE ENTRADA PRINCIPAL
+# ==============================================================================
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = LoginWindow(root)
+    root.mainloop()
